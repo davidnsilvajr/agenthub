@@ -5,6 +5,7 @@ from openai import AsyncOpenAI
 
 from app.core.config import settings
 from app.core.supabase import get_supabase
+from app.core.platform_settings import get_setting_value
 from app.models.schemas import ChatRequest, ChatResponse, AIProvider
 
 
@@ -58,7 +59,8 @@ async def run_agent(request: ChatRequest) -> ChatResponse:
     max_tokens = int(agent.get("max_tokens", 1024))
 
     if provider == AIProvider.anthropic:
-        client = Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+        api_key = get_setting_value("ANTHROPIC_API_KEY") or settings.ANTHROPIC_API_KEY
+        client = Anthropic(api_key=api_key)
         response = client.messages.create(
             model=model,
             system=system_prompt,
@@ -71,8 +73,26 @@ async def run_agent(request: ChatRequest) -> ChatResponse:
             "input_tokens": response.usage.input_tokens,
             "output_tokens": response.usage.output_tokens,
         }
+    elif provider == AIProvider.gemini:
+        import google.generativeai as genai
+        api_key = get_setting_value("GEMINI_API_KEY") or settings.GEMINI_API_KEY
+        genai.configure(api_key=api_key)
+        gemini_model = genai.GenerativeModel(
+            model_name=model,
+            system_instruction=system_prompt,
+        )
+        # Convert messages to Gemini format (exclude last user message; sent via send_message)
+        gemini_history = []
+        for msg in history:
+            role = "user" if msg["role"] == "user" else "model"
+            gemini_history.append({"role": role, "parts": [msg["content"]]})
+        chat = gemini_model.start_chat(history=gemini_history)
+        response = chat.send_message(request.message)
+        reply = response.text
+        usage = {"input_tokens": 0, "output_tokens": 0}  # Gemini doesn't expose token counts in basic API
     else:
-        client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+        api_key = get_setting_value("OPENAI_API_KEY") or settings.OPENAI_API_KEY
+        client = AsyncOpenAI(api_key=api_key)
         response = await client.chat.completions.create(
             model=model,
             messages=[{"role": "system", "content": system_prompt}] + messages,

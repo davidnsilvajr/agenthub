@@ -1,3 +1,4 @@
+from typing import Optional
 from fastapi import APIRouter, HTTPException
 from app.core.supabase import get_supabase
 from app.models.schemas import AgentCreate, AgentUpdate, ChatRequest, ChatResponse
@@ -7,9 +8,12 @@ router = APIRouter(prefix="/agents", tags=["agents"])
 
 
 @router.get("/")
-def list_agents(tenant_id: str):
+def list_agents(tenant_id: Optional[str] = None):
     sb = get_supabase()
-    result = sb.table("agents").select("*").eq("tenant_id", tenant_id).execute()
+    if tenant_id:
+        result = sb.table("agents").select("*").eq("tenant_id", tenant_id).execute()
+    else:
+        result = sb.table("agents").select("*").execute()
     return result.data
 
 
@@ -18,6 +22,16 @@ def create_agent(body: AgentCreate):
     sb = get_supabase()
     result = sb.table("agents").insert(body.model_dump(mode="json")).execute()
     return result.data[0]
+
+
+@router.post("/chat", response_model=ChatResponse)
+async def chat(body: ChatRequest):
+    try:
+        return await run_agent(body)
+    except ValueError as e:
+        raise HTTPException(404, str(e))
+    except Exception as e:
+        raise HTTPException(500, str(e))
 
 
 @router.get("/{agent_id}")
@@ -42,13 +56,3 @@ def delete_agent(agent_id: str):
     sb = get_supabase()
     sb.table("agents").delete().eq("id", agent_id).execute()
     return {"ok": True}
-
-
-@router.post("/chat", response_model=ChatResponse)
-async def chat(body: ChatRequest):
-    try:
-        return await run_agent(body)
-    except ValueError as e:
-        raise HTTPException(404, str(e))
-    except Exception as e:
-        raise HTTPException(500, str(e))

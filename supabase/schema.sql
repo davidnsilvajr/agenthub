@@ -111,3 +111,14 @@ create policy "service_role_all" on integrations for all using (true);
 create policy "service_role_all" on conversations for all using (true);
 create policy "service_role_all" on messages for all using (true);
 create policy "service_role_all" on usage_logs for all using (true);
+
+-- Platform settings (key-value store for API keys and configs)
+CREATE TABLE IF NOT EXISTS platform_settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL DEFAULT '',
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE platform_settings ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Service role full access" ON platform_settings
+  FOR ALL USING (auth.role() = 'service_role');

@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     # AI Providers
     ANTHROPIC_API_KEY: str = ""
     OPENAI_API_KEY: str = ""
+    GEMINI_API_KEY: str = ""
+    EVOLUTION_API_URL: str = ""
+    EVOLUTION_API_KEY: str = ""
 
     # Redis / Celery
     REDIS_URL: str = "redis://localhost:6379/0"

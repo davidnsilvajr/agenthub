@@ -7,6 +7,7 @@ from enum import Enum
 class AIProvider(str, Enum):
     anthropic = "anthropic"
     openai = "openai"
+    gemini = "gemini"
 
 
 class AgentStatus(str, Enum):
@@ -36,7 +37,7 @@ class Tenant(TenantCreate):
 
 # --- Agent ---
 class AgentCreate(BaseModel):
-    tenant_id: UUID4
+    tenant_id: Optional[UUID4] = None
     name: str
     description: Optional[str] = None
     system_prompt: str

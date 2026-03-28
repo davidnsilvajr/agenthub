@@ -1,15 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,37 +21,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Users, Bot, MessageSquare, ExternalLink } from "lucide-react";
-
-const mockTenants = [
-  {
-    id: "1",
-    name: "Empresa Alpha Ltda",
-    slug: "alpha",
-    plan: "pro",
-    agents: 5,
-    messages: 1234,
-    created_at: "2025-01-15",
-  },
-  {
-    id: "2",
-    name: "Construtora Beta",
-    slug: "beta",
-    plan: "starter",
-    agents: 2,
-    messages: 387,
-    created_at: "2025-02-03",
-  },
-  {
-    id: "3",
-    name: "Imobiliária Gama",
-    slug: "gama",
-    plan: "pro",
-    agents: 8,
-    messages: 2891,
-    created_at: "2025-02-20",
-  },
-];
+import { Plus, Users, Bot, MessageSquare, Loader2 } from "lucide-react";
+import { api } from "@/lib/api";
 
 const planColor: Record<string, string> = {
   free: "bg-gray-800 text-gray-300 border-gray-700",
@@ -60,21 +32,43 @@ const planColor: Record<string, string> = {
 };
 
 export default function TenantsPage() {
-  const [tenants, setTenants] = useState(mockTenants);
+  const router = useRouter();
+  const [tenants, setTenants] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({ name: "", slug: "", plan: "starter" });
 
-  function handleCreate() {
-    const newTenant = {
-      id: String(Date.now()),
-      ...form,
-      agents: 0,
-      messages: 0,
-      created_at: new Date().toISOString().split("T")[0],
-    };
-    setTenants((t) => [...t, newTenant]);
-    setOpen(false);
-    setForm({ name: "", slug: "", plan: "starter" });
+  async function loadTenants() {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await api.listTenants();
+      setTenants(data);
+    } catch (err: any) {
+      setError(err.message ?? "Erro ao carregar clientes");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadTenants();
+  }, []);
+
+  async function handleCreate() {
+    setCreating(true);
+    try {
+      await api.createTenant(form);
+      setOpen(false);
+      setForm({ name: "", slug: "", plan: "starter" });
+      await loadTenants();
+    } catch (err: any) {
+      alert(err.message ?? "Erro ao criar cliente");
+    } finally {
+      setCreating(false);
+    }
   }
 
   return (
@@ -85,12 +79,14 @@ export default function TenantsPage() {
           <p className="text-gray-400 text-sm mt-1">Gerencie os tenants da plataforma</p>
         </div>
 
-        <Button className="bg-violet-600 hover:bg-violet-700 text-white" onClick={() => setOpen(true)}>
+        <Button
+          className="bg-violet-600 hover:bg-violet-700 text-white"
+          onClick={() => setOpen(true)}
+        >
           <Plus className="w-4 h-4 mr-2" /> Novo Cliente
         </Button>
 
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger className="hidden" />
           <DialogContent className="bg-gray-900 border-gray-700 text-white max-w-md">
             <DialogHeader>
               <DialogTitle>Adicionar Cliente</DialogTitle>
@@ -121,7 +117,10 @@ export default function TenantsPage() {
               </div>
               <div className="space-y-1">
                 <Label>Plano</Label>
-                <Select value={form.plan} onValueChange={(v) => setForm((f) => ({ ...f, plan: v ?? "starter" }))}>
+                <Select
+                  value={form.plan}
+                  onValueChange={(v) => setForm((f) => ({ ...f, plan: v ?? "starter" }))}
+                >
                   <SelectTrigger className="bg-gray-800 border-gray-700">
                     <SelectValue />
                   </SelectTrigger>
@@ -136,54 +135,104 @@ export default function TenantsPage() {
               <Button
                 onClick={handleCreate}
                 className="w-full bg-violet-600 hover:bg-violet-700"
-                disabled={!form.name || !form.slug}
+                disabled={creating || !form.name || !form.slug}
               >
-                Criar Cliente
+                {creating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Criando...
+                  </>
+                ) : (
+                  "Criar Cliente"
+                )}
               </Button>
             </div>
           </DialogContent>
         </Dialog>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {tenants.map((tenant) => (
-          <Card key={tenant.id} className="bg-gray-900 border-gray-800">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-violet-900/50 flex items-center justify-center">
-                    <Users className="w-4 h-4 text-violet-400" />
+      {error && (
+        <div className="rounded-lg bg-red-900/30 border border-red-700/50 px-4 py-3 text-sm text-red-400">
+          {error}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => (
+            <Card key={i} className="bg-gray-900 border-gray-800">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Skeleton className="w-8 h-8 rounded-full bg-gray-800" />
+                    <Skeleton className="h-4 w-32 bg-gray-800" />
                   </div>
-                  <CardTitle className="text-white text-sm">{tenant.name}</CardTitle>
+                  <Skeleton className="h-5 w-16 bg-gray-800 rounded-full" />
                 </div>
-                <Badge className={`text-xs border ${planColor[tenant.plan]}`}>
-                  {tenant.plan}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <p className="text-xs text-gray-500 font-mono">/{tenant.slug}</p>
-              <div className="flex gap-4 text-xs text-gray-400">
-                <span className="flex items-center gap-1">
-                  <Bot className="w-3 h-3" /> {tenant.agents} agentes
-                </span>
-                <span className="flex items-center gap-1">
-                  <MessageSquare className="w-3 h-3" /> {tenant.messages.toLocaleString()} msgs
-                </span>
-              </div>
-              <div className="flex gap-2 pt-1">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="flex-1 text-xs text-gray-400 hover:text-white hover:bg-gray-800"
-                >
-                  <ExternalLink className="w-3 h-3 mr-1" /> Painel do Cliente
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Skeleton className="h-3 w-24 bg-gray-800" />
+                <Skeleton className="h-3 w-40 bg-gray-800" />
+                <Skeleton className="h-8 w-full bg-gray-800" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {tenants.length === 0 ? (
+            <div className="col-span-full border border-dashed border-gray-700 rounded-lg p-10 text-center">
+              <Users className="w-8 h-8 text-gray-600 mx-auto mb-2" />
+              <p className="text-gray-400 text-sm">Nenhum cliente cadastrado ainda</p>
+              <Button
+                size="sm"
+                className="mt-3 bg-violet-600 hover:bg-violet-700 text-white"
+                onClick={() => setOpen(true)}
+              >
+                <Plus className="w-3 h-3 mr-1" /> Adicionar primeiro cliente
+              </Button>
+            </div>
+          ) : (
+            tenants.map((tenant) => (
+              <Card
+                key={tenant.id}
+                className="bg-gray-900 border-gray-800 cursor-pointer hover:border-gray-600 transition-colors"
+                onClick={() => router.push(`/dashboard/tenants/${tenant.id}`)}
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-violet-900/50 flex items-center justify-center flex-shrink-0">
+                        <Users className="w-4 h-4 text-violet-400" />
+                      </div>
+                      <CardTitle className="text-white text-sm truncate">
+                        {tenant.name}
+                      </CardTitle>
+                    </div>
+                    <Badge
+                      className={`text-xs border flex-shrink-0 ${planColor[tenant.plan] ?? planColor.free}`}
+                    >
+                      {tenant.plan ?? "free"}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <p className="text-xs text-gray-500 font-mono">/{tenant.slug}</p>
+                  <div className="flex gap-4 text-xs text-gray-400">
+                    <span className="flex items-center gap-1">
+                      <Bot className="w-3 h-3" />
+                      {tenant.agents_count ?? 0} agentes
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <MessageSquare className="w-3 h-3" />
+                      {(tenant.messages ?? 0).toLocaleString()} msgs
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
+      )}
     </div>
   );
 }
