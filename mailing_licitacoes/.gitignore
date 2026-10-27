@@ -3,3 +3,5 @@ mailing_enriquecido.csv
 pncp_fornecedores.csv
 cache/
 __pycache__/
+enriquecido_*.csv
+*.log
