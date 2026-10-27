@@ -5,3 +5,5 @@ cache/
 __pycache__/
 enriquecido_*.csv
 *.log
+mailing_completo.xlsx
+enrich_full.log
