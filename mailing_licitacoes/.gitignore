@@ -7,3 +7,7 @@ enriquecido_*.csv
 *.log
 mailing_completo.xlsx
 enrich_full.log
+pncp_matches.jsonl
+pncp_scan.state
+pncp_contatos.csv
+pncp_chain.log
