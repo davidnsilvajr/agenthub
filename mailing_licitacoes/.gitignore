@@ -12,3 +12,5 @@ pncp_scan.state
 pncp_contatos.csv
 pncp_chain.log
 portal_propostas.csv
+data/
+portal_uberlandia.csv
